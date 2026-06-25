@@ -122,10 +122,29 @@ with st.sidebar:
 
     st.markdown("**📚 Select Subject**")
     subject = st.selectbox("Subject", [
-        "AIML / Machine Learning","Deep Learning","NLP",
-        "Computer Vision","Data Structures","DBMS",
-        "Operating Systems","Artificial Intelligence",
-        "Computer Networks","Software Engineering","Other"
+        # Engineering Core
+        "Engineering Mathematics",
+        "Engineering Physics",
+        "Engineering Chemistry",
+        # CSE / AIML
+        "AIML / Machine Learning",
+        "Deep Learning",
+        "NLP (Natural Language Processing)",
+        "Computer Vision",
+        "Data Structures & Algorithms",
+        "DBMS (Database Management)",
+        "Operating Systems",
+        "Artificial Intelligence",
+        "Computer Networks",
+        "Software Engineering",
+        "Theory of Computation",
+        "Compiler Design",
+        "Digital Electronics",
+        "Microprocessor & Microcontroller",
+        "Object Oriented Programming",
+        "Web Technologies",
+        # Other
+        "Other",
     ], label_visibility="collapsed")
     st.markdown("---")
 
@@ -188,25 +207,37 @@ col_btn, _ = st.columns([2, 3])
 with col_btn:
     analyze_btn = st.button("🔍  Analyze Papers", disabled=not uploaded_files)
 
-for key, val in [("done",False),("data",{}),("sn",subject)]:
+for key, val in [("done",False),("data",{}),("sn",subject),("last_subject","")]:
     if key not in st.session_state:
         st.session_state[key] = val
+
+# ── Clear stale results when subject changes ──────────────────
+if st.session_state.last_subject != subject:
+    st.session_state.done = False
+    st.session_state.data = {}
+    st.session_state.sn = subject
+    st.session_state.last_subject = subject
+    # clear MCQ cache too
+    for k in ["mcqs", "mcq_topic"]:
+        if k in st.session_state:
+            del st.session_state[k]
 
 # ── Analysis ──────────────────────────────────────────────────
 if analyze_btn and uploaded_files:
     try:
-        prog = st.progress(0, text="📄 Reading your PDFs...")
+        prog = st.progress(0, text=f"📄 Reading your {subject} exam papers...")
         raw_text = extract_text_from_multiple_pdfs(uploaded_files)
         if not raw_text.strip():
             st.error("❌ Could not read text from PDFs. Make sure they are not scanned images.")
             st.stop()
-        prog.progress(25, text="⚡ Sending to Groq AI (ultra fast)...")
+        prog.progress(25, text=f"⚡ Analyzing {subject} patterns with Groq AI...")
         data = analyze_all_in_one(raw_text, subject)
         st.session_state.data = data
-        st.session_state.sn = data.get("subject_detected", subject)
+        st.session_state.sn = subject   # always use selected subject, not AI guess
+        st.session_state.last_subject = subject
         st.session_state.done = True
         prog.progress(100, text="✅ Done! 1 API call used.")
-        st.success("🎉 Analysis complete! Just 1 API call used out of your 14,400 daily limit.")
+        st.success(f"🎉 {subject} analysis complete! Just 1 API call used out of your 14,400 daily limit.")
         st.balloons()
     except Exception as e:
         st.error(f"❌ {str(e)}")
