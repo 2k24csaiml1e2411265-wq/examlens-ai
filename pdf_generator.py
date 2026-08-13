@@ -78,7 +78,7 @@ def _build(title, subject, text):
     title_s, sub_s, h2_s, body_s = _styles()
     story = [
         Paragraph(html.escape(str(title)), title_s),
-        Paragraph(html.escape(f"Subject: {subject} • ExamLens AI v3"), sub_s),
+        Paragraph(html.escape(f"Subject: {subject} • ExamLens AI"), sub_s),
         HRFlowable(width="100%", thickness=1, color=PURPLE),
         Spacer(1, 10),
     ]

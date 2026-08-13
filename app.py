@@ -12,14 +12,14 @@ from pdf_generator import (
 )
 
 st.set_page_config(
-    page_title="ExamLens AI v3",
+    page_title="ExamLens AI",
     page_icon="🎯",
     layout="wide",
     initial_sidebar_state="expanded",
 )
 
 # ---------- Light theme ----------
-# ExamLens AI v3 uses a deliberately light, professional visual system.
+# ExamLens AI uses a deliberately light, professional visual system.
 # The palette is kept high-contrast and print-friendly for students.
 BG = "#F7F9FC"
 CARD = "#FFFFFF"
@@ -228,6 +228,76 @@ div[data-baseweb="textarea"] > div {{
     color: var(--el-muted) !important;
 }}
 
+/* Native Streamlit controls — keep every control in the light theme */
+div[data-baseweb="select"] > div,
+div[data-baseweb="select"] [role="button"],
+div[data-baseweb="input"] > div,
+div[data-baseweb="textarea"] > div {{
+    background: #FFFFFF !important;
+    color: var(--el-text) !important;
+    border-color: var(--el-border) !important;
+    box-shadow: none !important;
+}}
+div[data-baseweb="select"] [role="button"] *,
+div[data-baseweb="select"] input,
+div[data-baseweb="input"] input,
+div[data-baseweb="textarea"] textarea {{
+    color: var(--el-text) !important;
+    -webkit-text-fill-color: var(--el-text) !important;
+}}
+div[data-baseweb="select"] svg,
+div[data-baseweb="input"] svg {{
+    fill: var(--el-muted) !important;
+    color: var(--el-muted) !important;
+}}
+[data-baseweb="popover"],
+[data-baseweb="menu"],
+[data-baseweb="menu"] > div,
+[data-baseweb="popover"] [role="listbox"] {{
+    background: #FFFFFF !important;
+    color: var(--el-text) !important;
+    border-color: var(--el-border) !important;
+}}
+[data-baseweb="menu"] [role="option"] {{
+    background: #FFFFFF !important;
+    color: var(--el-text) !important;
+}}
+[data-baseweb="menu"] [role="option"]:hover,
+[data-baseweb="menu"] [aria-selected="true"] {{
+    background: #EEF2FF !important;
+    color: var(--el-accent-2) !important;
+}}
+
+/* File uploader: Streamlit's native upload button must stay light */
+[data-testid="stFileUploaderDropzone"] button,
+[data-testid="stFileUploaderDropzone"] [role="button"] {{
+    background: #FFFFFF !important;
+    color: var(--el-text) !important;
+    border: 1px solid var(--el-border) !important;
+    box-shadow: none !important;
+}}
+[data-testid="stFileUploaderDropzone"] button:hover,
+[data-testid="stFileUploaderDropzone"] [role="button"]:hover {{
+    background: #F8FAFC !important;
+    color: var(--el-accent-2) !important;
+    border-color: #A5B4FC !important;
+}}
+[data-testid="stFileUploaderDropzone"] button *,
+[data-testid="stFileUploaderDropzone"] [role="button"] * {{
+    color: inherit !important;
+    fill: currentColor !important;
+}}
+
+/* Hide Streamlit's dark top chrome so the application owns the visual frame. */
+header[data-testid="stHeader"] {{
+    background: transparent !important;
+    visibility: hidden !important;
+    height: 0 !important;
+}}
+header[data-testid="stHeader"] > div {{
+    background: transparent !important;
+}}
+#MainMenu, footer {{ visibility: hidden !important; }}
 /* Buttons */
 .stButton > button, .stDownloadButton > button {{
     min-height: 42px;
@@ -306,7 +376,7 @@ subjects = [
 
 with st.sidebar:
     st.markdown("## 🎯 ExamLens AI")
-    st.caption("v3 • light edition • evidence-first exam analysis")
+    st.caption("Light interface • evidence-first exam analysis")
     st.divider()
     subject = st.selectbox("📚 Subject", subjects)
     st.divider()
@@ -320,7 +390,7 @@ with st.sidebar:
 # ---------- Header ----------
 st.markdown("""
 <div class="hero">
-<h1>🎯 ExamLens AI <span class="hero-version">v3</span></h1>
+<h1>🎯 ExamLens AI</h1>
 <p>Turn previous-year papers into a focused, evidence-based study plan.</p>
 <span class="pill">⚡ Groq + Llama</span>
 <span class="pill">📄 Multi-PDF</span>
