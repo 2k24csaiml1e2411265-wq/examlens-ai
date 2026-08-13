@@ -409,16 +409,26 @@ def normalize_questions(value):
         return {}
     if isinstance(value, dict):
         if all(isinstance(v, (list, tuple)) for v in value.values()):
-            return {
-                str(k): [clean_question(q) for q in v if clean_question(q)]
-                for k, v in value.items()
-            }
+            normalized = {}
+            for k, items in value.items():
+                cleaned = []
+                for item in items:
+                    q = clean_question(item)
+                    if q:
+                        cleaned.append(q)
+                normalized[str(k)] = cleaned
+            return normalized
         for key in ("papers", "extracted_questions", "questions", "data"):
             if key in value:
                 return normalize_questions(value[key])
         return {"Questions": [clean_question(value)]}
     if isinstance(value, (list, tuple)):
-        return {"Extracted questions": [clean_question(q) for q in value if clean_question(q)]}
+        cleaned = []
+        for item in value:
+            q = clean_question(item)
+            if q:
+                cleaned.append(q)
+        return {"Extracted questions": cleaned}
     text = str(value).strip()
     if not text:
         return {}
