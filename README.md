@@ -1,61 +1,82 @@
 # 🎯 ExamLens AI
 
-An AI-powered university exam-paper analyzer built with Streamlit, Groq and Llama.
+> **AI-powered university exam paper analyzer, question predictor, and personalized study assistant.**
 
-## Improvements
+ExamLens AI is a Streamlit-based application that uses **Groq and Llama** to analyze previous-year university examination papers.
 
-- Fixed the startup typo in the original `app.py` (`mport` → `import`).
-- Stronger subject-locking: the model is explicitly prevented from substituting another subject.
-- Larger paper context window than the original 5,000-character slice.
-- Evidence-first analysis: frequencies and priorities are requested from the uploaded papers.
-- No fake subject-specific fallback predictions when the API fails.
-- MCQs now receive both the selected subject and topic as context.
-- Cleaner PDF generation with HTML escaping to prevent malformed exports.
-- Better extraction metadata so users can see whether a PDF contains readable text.
-- Analysis results are stored in Streamlit session state, so switching tabs does not repeat the main API call.
-- Configurable model through `GROQ_MODEL`.
-- More accurate UI copy: avoids hard-coding a specific daily quota.
-- Added a clearer error state instead of silently showing unrelated demo data.
+The application extracts questions from uploaded PDFs, identifies recurring topics and patterns, generates evidence-based question predictions, creates a personalized 7-day study roadmap, provides MCQ practice, and exports study material as PDFs.
 
-## Run locally
+---
 
-```bash
-python -m venv .venv
-# Windows:
-.venv\Scripts\activate
-# macOS/Linux:
-source .venv/bin/activate
+## ✨ Features
 
-pip install -r requirements.txt
-copy .env.example .env
-# Put your Groq key in .env
-streamlit run app.py
-```
+### 📄 Exam Paper Analysis
 
-`.env`:
-```env
-GROQ_API_KEY=your_key_here
-GROQ_MODEL=llama-3.3-70b-versatile
-```
+- Upload multiple previous-year examination papers.
+- Extract text from selectable-text PDFs.
+- Analyze papers for recurring concepts and question patterns.
+- Identify frequently appearing topics.
+- Prioritize important topics based on extracted evidence.
+- Display extraction statistics and analysis results.
 
-## Deployment
+### 🔮 Question Prediction
 
-For Streamlit Community Cloud, add `GROQ_API_KEY` under App → Settings → Secrets.
+ExamLens AI uses historical paper patterns to generate:
 
-## Important limitation
+- High-priority topics
+- Likely question areas
+- Repeated concepts
+- Evidence-based predictions
 
-`pdfplumber` extracts selectable PDF text. Scanned/image-only PDFs may produce little or no text. OCR should be added as a future enhancement if scanned papers are a requirement.
+> Predictions are forecasts based on historical data and should not be treated as guaranteed exam questions.
 
-## Suggested resume line
+### 📚 7-Day Study Roadmap
 
-**ExamLens AI — Exam Paper Analyzer & Question Predictor:** Built a Streamlit application that extracts university exam-paper text, uses an LLM to identify recurring topics and generate evidence-based predictions, creates a 7-day study roadmap and MCQ practice, and exports personalized PDFs.
+Generate a focused revision plan based on the analyzed topics.
 
+The roadmap helps students:
 
-## 🎨 User Interface
+- Prioritize important concepts
+- Organize revision time
+- Focus on frequently repeated topics
+- Prepare efficiently before examinations
 
-- Theme-aware light and dark styling across the application.
-- Improved sidebar, inputs, file uploader, tabs, buttons, cards and metrics.
-- Responsive hero section for smaller screens.
-- Cleaner native Streamlit control styling without overriding widget descendants globally.
-- Theme-aware Plotly charts with matching gridlines and hover labels.
-- Improved visual consistency between custom HTML components and Streamlit components.
+### 📝 MCQ Practice
+
+Generate AI-powered MCQs based on:
+
+- Selected subject
+- Selected topic
+- Analyzed exam-paper context
+
+This enables targeted practice rather than generic questions.
+
+### 📑 PDF Export
+
+Export generated content as PDFs, including:
+
+- Analysis results
+- Study roadmap
+- Predicted questions
+- Formulas
+- MCQs
+- Extracted questions
+
+The PDF generation layer also uses HTML escaping to reduce formatting issues.
+
+### 📋 Structured Extracted Questions
+
+Extracted questions are displayed in a clean paper-wise format:
+
+```text
+Paper 1
+
+1. Question one
+2. Question two
+3. Question three
+
+Paper 2
+
+1. Question one
+2. Question two
+3. Question three
