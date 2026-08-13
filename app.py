@@ -1,4 +1,9 @@
+import hashlib
 import html
+import json
+import re
+from datetime import date, timedelta
+
 import streamlit as st
 import pandas as pd
 import plotly.express as px
@@ -366,233 +371,384 @@ a {{ color: var(--el-accent) !important; }}
 </style>
 """, unsafe_allow_html=True)
 
-# ---------- Sidebar ----------
-subjects = [
-    "Engineering Mathematics", "Engineering Physics", "Engineering Chemistry",
-    "AIML / Machine Learning", "Deep Learning", "NLP (Natural Language Processing)",
-    "Computer Vision", "Data Structures & Algorithms", "DBMS (Database Management)",
-    "Operating Systems", "Artificial Intelligence", "Computer Networks",
-    "Software Engineering", "Theory of Computation", "Compiler Design",
-    "Digital Electronics", "Microprocessor & Microcontroller",
-    "Object Oriented Programming", "Web Technologies", "Other",
+
+# ---------- Robust data helpers ----------
+def esc(value):
+    return html.escape(str(value if value is not None else ""))
+
+
+def as_list(value):
+    if value is None:
+        return []
+    if isinstance(value, (list, tuple, set)):
+        return list(value)
+    if isinstance(value, dict):
+        for key in ("items", "questions", "topics", "predictions", "data", "results"):
+            if isinstance(value.get(key), (list, tuple)):
+                return list(value[key])
+        return [value]
+    if isinstance(value, str):
+        return [x.strip() for x in value.splitlines() if x.strip()]
+    return [value]
+
+
+def clean_question(value):
+    if isinstance(value, dict):
+        for key in ("question", "text", "prompt", "content", "query"):
+            if key in value:
+                return str(value[key]).strip()
+        return json.dumps(value, ensure_ascii=False)
+    text = str(value).strip()
+    text = re.sub(r"^\s*(?:[-*•]|\d+[\).])\s*", "", text)
+    return text
+
+
+def normalize_questions(value):
+    # Normalize model question output into {paper: [questions]} for UI/PDF.
+    if value is None:
+        return {}
+    if isinstance(value, dict):
+        if all(isinstance(v, (list, tuple)) for v in value.values()):
+            return {
+                str(k): [clean_question(q) for q in v if clean_question(q)]
+                for k, v in value.items()
+            }
+        for key in ("papers", "extracted_questions", "questions", "data"):
+            if key in value:
+                return normalize_questions(value[key])
+        return {"Questions": [clean_question(value)]}
+    if isinstance(value, (list, tuple)):
+        return {"Extracted questions": [clean_question(q) for q in value if clean_question(q)]}
+    text = str(value).strip()
+    if not text:
+        return {}
+    return {"Extracted questions": [clean_question(x) for x in text.splitlines() if clean_question(x)]}
+
+
+def question_count(qmap):
+    return sum(len(v) for v in qmap.values())
+
+
+def questions_dataframe(qmap):
+    rows=[]
+    for paper, qs in qmap.items():
+        for i,q in enumerate(qs,1):
+            rows.append({"Paper":paper,"Question #":i,"Question":q})
+    return pd.DataFrame(rows, columns=["Paper","Question #","Question"])
+
+
+def question_text(qmap):
+    out=[]
+    for paper,qs in qmap.items():
+        out.append(str(paper))
+        out.extend(f"{i}. {q}" for i,q in enumerate(qs,1))
+        out.append("")
+    return "\n".join(out).strip()
+
+
+def file_signature(files):
+    h=hashlib.sha256()
+    for f in files or []:
+        h.update(f.name.encode("utf-8"))
+        h.update(str(getattr(f,"size",0)).encode("utf-8"))
+        try: h.update(f.getvalue())
+        except Exception: pass
+    return h.hexdigest()
+
+
+def safe_int(value, default=0):
+    try: return int(value)
+    except Exception: return default
+
+
+def fmt_num(value):
+    try: return f"{int(value):,}"
+    except Exception: return str(value)
+
+
+def analysis_json(data):
+    return json.dumps(data, ensure_ascii=False, indent=2, default=str)
+
+
+def prediction_text(data):
+    p10=as_list(data.get("predicted_10mark",[])); p2=as_list(data.get("predicted_2mark",[]))
+    lines=["## Predicted long-answer questions",""]
+    lines += [f"{i}. {clean_question(q)}" for i,q in enumerate(p10,1)]
+    lines += ["","## Predicted short-answer questions",""]
+    lines += [f"{i}. {clean_question(q)}" for i,q in enumerate(p2,1)]
+    if data.get("wildcard_question"):
+        lines += ["","## Wildcard",str(data.get("wildcard_question")),f"Reason: {data.get('wildcard_reason','Pattern-based uncertainty.')}"]
+    return "\n".join(lines)
+
+
+def roadmap_text(roadmap):
+    lines=["## 7-Day Roadmap",""]
+    for i,day in enumerate(as_list(roadmap),1):
+        if not isinstance(day,dict):
+            lines += [f"Day {i}: {day}",""]
+            continue
+        lines += [f"Day {day.get('day',i)}: {day.get('topic','')}",f"Focus: {day.get('focus','')}"]
+        lines += [f"- {x}" for x in as_list(day.get('tasks',[]))]
+        lines += [f"Tip: {day.get('tip','')}",""]
+    return "\n".join(lines)
+
+
+def chart_layout(fig, title=None, height=420):
+    fig.update_layout(title=title,height=height,paper_bgcolor=BG,plot_bgcolor=BG,font_color=TEXT,
+                      margin=dict(l=20,r=20,t=55,b=30),hoverlabel=dict(bgcolor=CARD,font_color=TEXT))
+    fig.update_xaxes(gridcolor=CHART_GRID,zerolinecolor=CHART_GRID)
+    fig.update_yaxes(gridcolor=CHART_GRID,zerolinecolor=CHART_GRID)
+    return fig
+
+
+def init_state():
+    defaults={
+        "analysis":None,"mcqs":None,"mcq_topic_name":"","paper_meta":[],
+        "analysis_subject":"","upload_signature":"","raw_text":"",
+        "question_search":"","formula_search":"","analysis_runs":0,
+    }
+    for k,v in defaults.items():
+        if k not in st.session_state: st.session_state[k]=v
+
+
+init_state()
+
+SUBJECTS=[
+    "Engineering Mathematics","Engineering Physics","Engineering Chemistry",
+    "AIML / Machine Learning","Deep Learning","NLP (Natural Language Processing)",
+    "Computer Vision","Data Structures & Algorithms","DBMS (Database Management)",
+    "Operating Systems","Artificial Intelligence","Computer Networks",
+    "Software Engineering","Theory of Computation","Compiler Design",
+    "Digital Electronics","Microprocessor & Microcontroller","Object Oriented Programming",
+    "Web Technologies","Other",
 ]
 
+# ---------- Sidebar ----------
 with st.sidebar:
     st.markdown("## 🎯 ExamLens AI")
     st.caption("Light interface • evidence-first exam analysis")
     st.divider()
-    subject = st.selectbox("📚 Subject", subjects)
+    subject=st.selectbox("📚 Subject",SUBJECTS,key="subject_selector")
+    st.divider()
+    st.markdown("### ⚙️ Study settings")
+    exam_date=st.date_input("🗓️ Exam date",value=date.today()+timedelta(days=7),min_value=date.today(),key="exam_date")
+    daily_hours=st.slider("⏱️ Daily study hours",1,12,3,key="daily_hours")
     st.divider()
     st.markdown("### Pipeline")
-    for x in ["Upload PDFs", "Extract text", "Analyze patterns", "Predict questions",
-              "Build roadmap", "Practice MCQs", "Export PDFs"]:
-        st.write("✓ " + x)
+    for item in ["Upload PDFs","Extract text","Analyze patterns","Predict questions","Build roadmap","Practice MCQs","Export PDFs"]:
+        st.write("✓ "+item)
     st.divider()
-    st.caption("🔐 PDFs are processed in the current session. The app does not save uploaded files to a database.")
+    st.caption("🔐 PDFs are processed in the current session. This app does not save uploaded files to a database.")
+
+if st.session_state.analysis_subject and st.session_state.analysis_subject != subject:
+    st.session_state.analysis=None; st.session_state.paper_meta=[]; st.session_state.raw_text=""; st.session_state.mcqs=None; st.session_state.upload_signature=""
+st.session_state.analysis_subject=subject
 
 # ---------- Header ----------
-st.markdown("""
-<div class="hero">
-<h1>🎯 ExamLens AI</h1>
-<p>Turn previous-year papers into a focused, evidence-based study plan.</p>
-<span class="pill">⚡ Groq + Llama</span>
-<span class="pill">📄 Multi-PDF</span>
-<span class="pill">📊 Topic Patterns</span>
-<span class="pill">🎯 Predictions</span>
-<span class="pill">🗺️ 7-Day Plan</span>
-<span class="pill">📝 MCQs</span>
-</div>
-""", unsafe_allow_html=True)
+st.markdown('''<div class="hero"><h1>🎯 ExamLens AI</h1><p>Turn previous-year papers into a focused, evidence-based study plan.</p><span class="pill">⚡ Groq + Llama</span><span class="pill">📄 Multi-PDF</span><span class="pill">📊 Topic Patterns</span><span class="pill">🎯 Predictions</span><span class="pill">🗺️ 7-Day Plan</span><span class="pill">📝 MCQs</span></div>''',unsafe_allow_html=True)
 
 # ---------- Upload ----------
-st.subheader("📄 1. Upload previous-year papers")
-files = st.file_uploader(
-    "Upload selectable-text PDFs", type=["pdf"], accept_multiple_files=True,
-    help="Best results come from selectable-text PDFs. Scanned PDFs may need OCR.",
-)
-
+st.subheader("📄 Upload previous-year papers")
+files=st.file_uploader("Upload selectable-text PDFs",type=["pdf"],accept_multiple_files=True,
+                       help="Best results come from clear selectable-text PDFs from the same subject. Scanned PDFs may need OCR.")
 if files:
-    st.success(f"{len(files)} paper(s) selected: " + ", ".join(f.name for f in files))
+    sig=file_signature(files)
+    if sig != st.session_state.upload_signature:
+        st.session_state.analysis=None; st.session_state.paper_meta=[]; st.session_state.raw_text=""; st.session_state.mcqs=None; st.session_state.upload_signature=sig
+    st.success(f"{len(files)} paper(s) selected: "+", ".join(f.name for f in files))
+    with st.expander("📁 Uploaded papers",expanded=False):
+        for i,f in enumerate(files,1):
+            st.write(f"**{i}. {f.name}** · {fmt_num(getattr(f,'size',0)/1024)} KB")
 
-if "analysis" not in st.session_state:
-    st.session_state.analysis = None
-if "mcqs" not in st.session_state:
-    st.session_state.mcqs = None
-if "paper_meta" not in st.session_state:
-    st.session_state.paper_meta = []
-if "analysis_subject" not in st.session_state:
-    st.session_state.analysis_subject = ""
+c1,c2,c3=st.columns([2,1,1])
+with c1:
+    analyze=st.button("🔍 Analyze papers",type="primary",disabled=not files,use_container_width=True)
+with c2:
+    if st.session_state.analysis and st.button("🧹 Clear analysis",use_container_width=True):
+        st.session_state.analysis=None; st.session_state.paper_meta=[]; st.session_state.raw_text=""; st.session_state.mcqs=None; st.rerun()
+with c3:
+    if st.session_state.analysis:
+        st.download_button("⬇️ JSON report",analysis_json(st.session_state.analysis),"examlens_analysis.json","application/json",use_container_width=True)
 
-if st.session_state.analysis_subject != subject:
-    st.session_state.analysis = None
-    st.session_state.paper_meta = []
-    st.session_state.analysis_subject = subject
-
-analyze = st.button("🔍 Analyze papers", type="primary", disabled=not files, use_container_width=True)
-
+# ---------- Analysis ----------
 if analyze:
-    with st.status("Running ExamLens AI pipeline…", expanded=True) as status:
-        st.write("Extracting text from uploaded PDFs…")
-        raw, meta = extract_text_from_multiple_pdfs(files)
-        st.session_state.paper_meta = meta
-        readable = sum(1 for m in meta if m["status"] == "ok")
-        st.write(f"Readable papers: {readable}/{len(meta)}")
-
-        if not raw.strip() or readable == 0:
-            status.update(label="No readable PDF text found", state="error")
-            st.error("These PDFs appear to be scanned/image-only or have no extractable text. Add OCR support or upload selectable-text PDFs.")
-            st.stop()
-
-        st.write(f"Analyzing {subject} with the selected model…")
-        data = analyze_all_in_one(raw, subject)
-        st.session_state.analysis = data
-
-        if data.get("analysis_status") == "success":
-            status.update(label="Analysis complete", state="complete")
-        else:
-            status.update(label="Analysis failed", state="error")
+    try:
+        with st.status("Running ExamLens AI pipeline…",expanded=True) as status:
+            st.write("1/2 • Extracting text from uploaded PDFs…")
+            raw,meta=extract_text_from_multiple_pdfs(files)
+            st.session_state.raw_text=raw or ""; st.session_state.paper_meta=meta or []
+            readable=sum(1 for m in (meta or []) if isinstance(m,dict) and m.get("status")=="ok")
+            st.write(f"Readable papers: {readable}/{len(meta or [])}")
+            if not raw or not raw.strip() or readable==0:
+                status.update(label="No readable PDF text found",state="error")
+                st.error("No machine-readable text was found. Upload selectable-text PDFs or add OCR support for scanned papers.")
+                st.stop()
+            st.write(f"2/2 • Analyzing {subject} with the configured model…")
+            data=analyze_all_in_one(raw,subject)
+            if not isinstance(data,dict): raise ValueError("The AI analysis returned an invalid response format.")
+            st.session_state.analysis=data; st.session_state.mcqs=None; st.session_state.analysis_runs+=1
+            if data.get("analysis_status")=="success": status.update(label="Analysis complete",state="complete")
+            else:
+                status.update(label="Analysis returned an error",state="error")
+                st.error(str(data.get("error","The model could not complete the analysis.")))
+    except Exception as exc:
+        st.session_state.analysis=None
+        st.error(f"Analysis failed: {exc}")
 
 # ---------- Results ----------
-d = st.session_state.analysis
-if d and d.get("analysis_status") == "success":
-    tf = d.get("topic_frequency", {})
-    hp = d.get("high_priority_topics", [])
-    mp = d.get("medium_priority_topics", [])
-    lp = d.get("low_priority_topics", [])
-    questions = d.get("extracted_questions", "")
-    roadmap = d.get("roadmap", [])
-    formulas = d.get("key_formulas", [])
+d=st.session_state.analysis
+if d and d.get("analysis_status")=="success":
+    tf=d.get("topic_frequency") or {}; hp=as_list(d.get("high_priority_topics",[])); mp=as_list(d.get("medium_priority_topics",[])); lp=as_list(d.get("low_priority_topics",[]))
+    qmap=normalize_questions(d.get("extracted_questions")); roadmap=as_list(d.get("roadmap",[])); formulas=as_list(d.get("key_formulas",[]))
+    p10=as_list(d.get("predicted_10mark",[])); p2=as_list(d.get("predicted_2mark",[])); diff=d.get("difficulty_distribution") or {}
+    qdf=questions_dataframe(qmap)
+    total_chars=sum(safe_int(m.get("characters",0)) for m in st.session_state.paper_meta if isinstance(m,dict))
+    total_questions=safe_int(d.get("total_questions_analyzed",question_count(qmap)),question_count(qmap))
 
-    st.markdown('<div class="notice">✅ <b>Evidence-first result:</b> topic frequency and priorities are derived from the extracted paper text; predictions are forecasts, not guarantees.</div>', unsafe_allow_html=True)
+    st.markdown('<div class="notice">✅ <b>Evidence-first result:</b> topic frequency and priorities are derived from extracted paper text; predictions are forecasts, not guarantees.</div>',unsafe_allow_html=True)
+    cols=st.columns(5)
+    for col,(n,label) in zip(cols,[(len(files) if files else len(st.session_state.paper_meta),"Papers"),(total_questions,"Questions"),(len(tf),"Topics"),(len(hp),"High priority"),(total_chars,"Extracted chars")]):
+        with col: st.markdown(f'<div class="card metric"><div class="n">{fmt_num(n)}</div><div class="l">{esc(label)}</div></div>',unsafe_allow_html=True)
 
-    cols = st.columns(5)
-    metrics = [
-        (len(files), "Papers"), (d.get("total_questions_analyzed", 0), "Questions"),
-        (len(tf), "Topics"), (len(hp), "High priority"),
-        (sum(m.get("characters", 0) for m in st.session_state.paper_meta), "Extracted chars"),
-    ]
-    for col, (n, label) in zip(cols, metrics):
-        with col:
-            st.markdown(f'<div class="card metric"><div class="n">{n}</div><div class="l">{label}</div></div>', unsafe_allow_html=True)
+    days_left=max((exam_date-date.today()).days,0)
+    x,y,z=st.columns(3)
+    with x: st.metric("🗓️ Days remaining",days_left)
+    with y: st.metric("⏱️ Daily target",f"{daily_hours} h")
+    with z: st.metric("🎯 High-priority topics",len(hp))
+    st.progress(max(0,min(1,1-days_left/7)),text=f"Revision countdown: {days_left} day(s) remaining")
 
     st.markdown("### Results")
-    tabs = st.tabs(["📊 Patterns", "🎯 Predictions", "🗺️ Roadmap", "📐 Formulas", "📝 MCQs", "📋 Questions"])
+    tabs=st.tabs(["📊 Patterns","🎯 Predictions","🗺️ Roadmap","📐 Formulas","📝 MCQs","📋 Questions","📄 Paper Text","📥 Export"])
 
     with tabs[0]:
         if tf:
-            df = pd.DataFrame({"Topic": list(tf.keys()), "Frequency": list(tf.values())}).sort_values("Frequency", ascending=False)
-            fig = px.bar(df, x="Topic", y="Frequency", text="Frequency", title=f"Recurring topics — {subject}")
-            fig.update_layout(height=420, xaxis_tickangle=-30, paper_bgcolor=BG, plot_bgcolor=BG, font_color=TEXT, hoverlabel=dict(bgcolor=CARD, font_color=TEXT), xaxis=dict(gridcolor=CHART_GRID, zerolinecolor=CHART_GRID), yaxis=dict(gridcolor=CHART_GRID, zerolinecolor=CHART_GRID))
-            st.plotly_chart(fig, use_container_width=True)
-        else:
-            st.info("No reliable topic-frequency data was returned.")
-
-        a, b = st.columns(2)
+            freq_df=pd.DataFrame({"Topic":[str(k) for k in tf.keys()],"Frequency":[safe_int(v) for v in tf.values()]}).sort_values("Frequency",ascending=False)
+            st.dataframe(freq_df,use_container_width=True,hide_index=True)
+            fig=px.bar(freq_df.head(15),x="Topic",y="Frequency",text="Frequency",title=f"Top recurring topics — {subject}")
+            chart_layout(fig,height=430); fig.update_xaxes(tickangle=-30); st.plotly_chart(fig,use_container_width=True)
+            pareto=freq_df.copy(); total=max(pareto.Frequency.sum(),1); pareto["Cumulative %"]=pareto.Frequency.cumsum()/total*100
+            figp=go.Figure(); figp.add_bar(x=pareto.Topic.head(12),y=pareto.Frequency.head(12),name="Frequency"); figp.add_scatter(x=pareto.Topic.head(12),y=pareto["Cumulative %"].head(12),name="Cumulative %",mode="lines+markers",yaxis="y2")
+            figp.update_layout(yaxis=dict(title="Frequency",gridcolor=CHART_GRID),yaxis2=dict(title="Cumulative %",overlaying="y",side="right",range=[0,110],gridcolor=CHART_GRID)); chart_layout(figp,"Topic concentration",400); st.plotly_chart(figp,use_container_width=True)
+            st.download_button("⬇️ Topic frequency CSV",freq_df.to_csv(index=False),"examlens_topic_frequency.csv","text/csv")
+        else: st.info("No reliable topic-frequency data was returned.")
+        a,b=st.columns(2)
         with a:
-            st.markdown("#### 🔥 Priority")
-            for t in hp: st.markdown(f'<div class="priority">🔥 {html.escape(str(t))}</div>', unsafe_allow_html=True)
-            for t in mp: st.markdown(f'<div class="priority">🟡 {html.escape(str(t))}</div>', unsafe_allow_html=True)
-            for t in lp: st.markdown(f'<div class="priority">🟢 {html.escape(str(t))}</div>', unsafe_allow_html=True)
+            st.markdown("#### 🔥 Priority map")
+            for t in hp: st.markdown(f'<div class="priority">🔥 <b>High</b> · {esc(t)}</div>',unsafe_allow_html=True)
+            for t in mp: st.markdown(f'<div class="priority">🟡 <b>Medium</b> · {esc(t)}</div>',unsafe_allow_html=True)
+            for t in lp: st.markdown(f'<div class="priority">🟢 <b>Low</b> · {esc(t)}</div>',unsafe_allow_html=True)
         with b:
-            diff = d.get("difficulty_distribution", {})
             if diff:
-                fig2 = go.Figure(go.Bar(
-                    x=list(diff.values()), y=list(diff.keys()), orientation="h",
-                    text=list(diff.values()), textposition="outside"
-                ))
-                fig2.update_layout(title="Difficulty distribution", height=300, paper_bgcolor=BG, plot_bgcolor=BG, font_color=TEXT, hoverlabel=dict(bgcolor=CARD, font_color=TEXT), xaxis=dict(gridcolor=CHART_GRID, zerolinecolor=CHART_GRID), yaxis=dict(gridcolor=CHART_GRID, zerolinecolor=CHART_GRID))
-                st.plotly_chart(fig2, use_container_width=True)
-
-        with st.expander("Paper extraction quality"):
-            st.dataframe(pd.DataFrame(st.session_state.paper_meta), use_container_width=True, hide_index=True)
+                diff_df=pd.DataFrame({"Difficulty":list(diff.keys()),"Count":[safe_int(v) for v in diff.values()]})
+                fig2=px.bar(diff_df,x="Count",y="Difficulty",orientation="h",text="Count",title="Difficulty distribution"); chart_layout(fig2,height=320); st.plotly_chart(fig2,use_container_width=True)
+            else: st.info("No difficulty distribution was returned.")
+        with st.expander("📄 Paper extraction quality"):
+            if st.session_state.paper_meta: st.dataframe(pd.DataFrame(st.session_state.paper_meta),use_container_width=True,hide_index=True)
 
     with tabs[1]:
-        p10, p2 = d.get("predicted_10mark", []), d.get("predicted_2mark", [])
-        st.markdown("#### 🎯 Longer-answer predictions")
-        for i, q in enumerate(p10, 1):
-            st.markdown(f'<div class="pred"><b>{i}.</b> {html.escape(str(q))}</div>', unsafe_allow_html=True)
-        st.markdown("#### ⚡ Short-answer predictions")
-        for i, q in enumerate(p2, 1):
-            st.markdown(f'<div class="pred"><b>{i}.</b> {html.escape(str(q))}</div>', unsafe_allow_html=True)
-
-        if d.get("wildcard_question"):
-            st.warning(f"Wildcard: {d['wildcard_question']}\n\nReason: {d.get('wildcard_reason','')}")
-
-        text = "## Predicted long-answer questions\n" + "\n".join(f"{i}. {q}" for i, q in enumerate(p10, 1))
-        text += "\n\n## Predicted short-answer questions\n" + "\n".join(f"{i}. {q}" for i, q in enumerate(p2, 1))
-        if d.get("wildcard_question"):
-            text += f"\n\n## Wildcard\n{d['wildcard_question']}\nReason: {d.get('wildcard_reason','')}"
-        st.download_button("⬇️ Export predictions PDF", generate_predictions_pdf(text, subject),
-                           "examlens_predictions.pdf", "application/pdf")
+        ptype=st.radio("Prediction type",["All","Long-answer","Short-answer"],horizontal=True,key="prediction_filter")
+        if ptype in ("All","Long-answer"):
+            st.markdown("#### 🎯 Longer-answer predictions")
+            for i,q in enumerate(p10,1): st.markdown(f'<div class="pred"><b>{i}.</b> {esc(clean_question(q))}</div>',unsafe_allow_html=True)
+        if ptype in ("All","Short-answer"):
+            st.markdown("#### ⚡ Short-answer predictions")
+            for i,q in enumerate(p2,1): st.markdown(f'<div class="pred"><b>{i}.</b> {esc(clean_question(q))}</div>',unsafe_allow_html=True)
+        if d.get("wildcard_question"): st.warning(f"Wildcard: {d.get('wildcard_question')}\n\nReason: {d.get('wildcard_reason','Pattern-based uncertainty.')}")
+        st.caption("Predictions are revision priorities, not guaranteed questions.")
+        st.download_button("⬇️ Export predictions PDF",generate_predictions_pdf(prediction_text(d),subject),"examlens_predictions.pdf","application/pdf")
 
     with tabs[2]:
-        if not roadmap:
-            st.info("No roadmap was returned.")
-        for day in roadmap:
-            st.markdown(f"""<div class="day">
-            <b>Day {day.get('day','')} • {day.get('hours',3)} hours</b><br>
-            <strong>{html.escape(str(day.get('topic','')))}</strong><br>
-            <span style="color:{MUTED}">{html.escape(str(day.get('focus','')))}</span><br><br>
-            {" • ".join(html.escape(str(x)) for x in day.get("tasks", []))}<br>
-            <small>💡 {html.escape(str(day.get('tip','')))}</small>
-            </div>""", unsafe_allow_html=True)
-        tips = d.get("quick_tips", [])
+        if not roadmap: st.info("No roadmap was returned.")
+        completed=0
+        for idx,day in enumerate(roadmap,1):
+            if not isinstance(day,dict): day={"day":idx,"topic":str(day),"tasks":[]}
+            dayno=safe_int(day.get("day"),idx); done=st.checkbox(f"Day {dayno} complete",key=f"roadmap_done_{dayno}")
+            if done: completed+=1
+            st.markdown(f'<div class="day"><b>Day {dayno} • {esc(day.get("hours",daily_hours))} hours</b><br><strong>{esc(day.get("topic",""))}</strong><br><span style="color:{MUTED}">{esc(day.get("focus",""))}</span><br><br>{" • ".join(esc(x) for x in as_list(day.get("tasks",[])))}<br><small>💡 {esc(day.get("tip",""))}</small></div>',unsafe_allow_html=True)
+        if roadmap: st.progress(completed/len(roadmap),text=f"Roadmap progress: {completed}/{len(roadmap)} days complete")
+        tips=as_list(d.get("quick_tips",[]))
         if tips:
-            st.info("Exam tips\n\n" + "\n".join("• " + str(x) for x in tips))
-        rm_text = "## 7-Day Roadmap\n\n"
-        for day in roadmap:
-            rm_text += f"Day {day.get('day')}: {day.get('topic')}\nFocus: {day.get('focus')}\n"
-            rm_text += "\n".join("- " + str(x) for x in day.get("tasks", [])) + f"\nTip: {day.get('tip')}\n\n"
-        st.download_button("⬇️ Export roadmap PDF", generate_roadmap_pdf(rm_text, subject),
-                           "examlens_roadmap.pdf", "application/pdf")
+            st.markdown("#### 💡 Exam tips")
+            for tip in tips: st.info(str(tip))
+        st.download_button("⬇️ Export roadmap PDF",generate_roadmap_pdf(roadmap_text(roadmap),subject),"examlens_roadmap.pdf","application/pdf")
 
     with tabs[3]:
         if formulas:
-            for i, f in enumerate(formulas, 1):
-                st.markdown(f'<div class="formula">📐 {i}. {html.escape(str(f))}</div>', unsafe_allow_html=True)
-        else:
-            st.info("No formulas/definitions were returned.")
+            fs=st.text_input("🔎 Search formulas / definitions",key="formula_search",placeholder="Search a concept…")
+            shown=[f for f in formulas if not fs or fs.lower() in str(f).lower()]
+            st.caption(f"Showing {len(shown)} of {len(formulas)} items")
+            for i,f in enumerate(shown,1): st.markdown(f'<div class="formula">📐 <b>{i}.</b> {esc(f)}</div>',unsafe_allow_html=True)
+        else: st.info("No formulas or definitions were returned.")
 
     with tabs[4]:
-        if not hp:
-            st.info("Run an analysis with at least one detected topic first.")
+        if not hp: st.info("Run an analysis with at least one detected topic first.")
         else:
-            topic = st.selectbox("Topic", hp, key="mcq_topic_select")
-            n = st.slider("Number of MCQs", 3, 10, 5)
-            if st.button("🎲 Generate MCQs", key="generate_mcqs"):
-                with st.spinner("Generating MCQs…"):
-                    try:
-                        st.session_state.mcqs = generate_mcqs(subject, topic, n)
-                        st.session_state.mcq_topic_name = topic
-                    except Exception as exc:
-                        st.error(str(exc))
-            if st.session_state.get("mcqs"):
-                st.markdown(st.session_state.mcqs)
-                st.download_button(
-                    "⬇️ Export MCQs PDF",
-                    generate_mcq_pdf(st.session_state.mcqs, st.session_state.get("mcq_topic_name", topic)),
-                    "examlens_mcqs.pdf", "application/pdf"
-                )
+            topic=st.selectbox("Topic",[str(x) for x in hp],key="mcq_topic_select")
+            n=st.slider("Number of MCQs",3,15,5,key="mcq_count")
+            c1,c2=st.columns(2)
+            with c1:
+                if st.button("🎲 Generate MCQs",key="generate_mcqs",type="primary"):
+                    with st.spinner("Generating targeted MCQs…"):
+                        try:
+                            st.session_state.mcqs=generate_mcqs(subject,topic,n); st.session_state.mcq_topic_name=topic
+                        except Exception as exc: st.error(f"MCQ generation failed: {exc}")
+            with c2:
+                if st.session_state.mcqs and st.button("🧹 Clear MCQs",key="clear_mcqs"): st.session_state.mcqs=None; st.rerun()
+            if st.session_state.mcqs:
+                st.markdown("#### Practice set"); st.markdown(str(st.session_state.mcqs))
+                st.download_button("⬇️ Export MCQs PDF",generate_mcq_pdf(st.session_state.mcqs,st.session_state.get("mcq_topic_name",topic)),"examlens_mcqs.pdf","application/pdf")
 
     with tabs[5]:
-        if questions:
-            st.text_area("Extracted questions", questions, height=480)
-            st.download_button(
-                "⬇️ Export extracted questions PDF",
-                generate_extracted_questions_pdf(questions, subject),
-                "examlens_extracted_questions.pdf", "application/pdf"
-            )
+        if not qmap: st.info("No questions were extracted.")
         else:
-            st.info("No questions were extracted.")
+            st.markdown("#### 📋 Extracted questions")
+            st.caption(f"{question_count(qmap)} questions across {len(qmap)} paper(s)")
+            qsearch=st.text_input("🔎 Search extracted questions",key="question_search",placeholder="Search a keyword or concept…")
+            paper_filter=st.selectbox("Filter by paper",["All papers"]+list(qmap.keys()),key="question_paper_filter")
+            shown=qdf.copy()
+            if qsearch: shown=shown[shown["Question"].str.contains(qsearch,case=False,regex=False,na=False)]
+            if paper_filter!="All papers": shown=shown[shown["Paper"]==paper_filter]
+            st.caption(f"Showing {len(shown)} question(s)")
+            st.dataframe(shown,use_container_width=True,hide_index=True,height=430)
+            st.download_button("⬇️ Questions CSV",qdf.to_csv(index=False),"examlens_questions.csv","text/csv")
+            with st.expander("📖 Paper-wise readable view"):
+                for paper,qs in qmap.items():
+                    st.markdown(f"**{esc(paper)}**")
+                    for i,q in enumerate(qs,1): st.markdown(f"{i}. {esc(q)}")
+            st.download_button("⬇️ Extracted questions PDF",generate_extracted_questions_pdf(question_text(qmap),subject),"examlens_extracted_questions.pdf","application/pdf")
+
+    with tabs[6]:
+        raw=st.session_state.raw_text or ""
+        if not raw: st.info("Raw extracted text is not available in this session.")
+        else:
+            st.markdown("#### 📄 Extracted source text")
+            st.caption(f"{fmt_num(len(raw))} characters • Verify what the AI received before relying on predictions.")
+            limit=st.slider("Preview length",2000,min(max(len(raw),2000),30000),min(max(len(raw),2000),10000),1000,key="raw_preview_limit")
+            st.text_area("Source text preview",raw[:limit],height=480,key="raw_text_preview")
+            st.download_button("⬇️ Download extracted text",raw,"examlens_extracted_text.txt","text/plain")
+
+    with tabs[7]:
+        st.markdown("#### 📥 Export center")
+        e1,e2=st.columns(2)
+        with e1:
+            st.download_button("⬇️ Complete analysis JSON",analysis_json(d),"examlens_complete_analysis.json","application/json",use_container_width=True)
+            st.download_button("⬇️ Predictions PDF",generate_predictions_pdf(prediction_text(d),subject),"examlens_predictions.pdf","application/pdf",use_container_width=True)
+            st.download_button("⬇️ Roadmap PDF",generate_roadmap_pdf(roadmap_text(roadmap),subject),"examlens_roadmap.pdf","application/pdf",use_container_width=True)
+        with e2:
+            if st.session_state.mcqs:
+                st.download_button("⬇️ MCQs PDF",generate_mcq_pdf(st.session_state.mcqs,st.session_state.get("mcq_topic_name","Practice")),"examlens_mcqs.pdf","application/pdf",use_container_width=True)
+            if qmap:
+                st.download_button("⬇️ Questions PDF",generate_extracted_questions_pdf(question_text(qmap),subject),"examlens_extracted_questions.pdf","application/pdf",use_container_width=True)
+                st.download_button("⬇️ Questions CSV",qdf.to_csv(index=False),"examlens_questions.csv","text/csv",use_container_width=True)
+            st.download_button("⬇️ Extracted text TXT",st.session_state.raw_text or "","examlens_extracted_text.txt","text/plain",use_container_width=True)
+        st.divider()
+        st.markdown("#### 📊 Analysis summary")
+        st.json({"project":"ExamLens AI","subject":subject,"papers":len(files) if files else len(st.session_state.paper_meta),"questions":total_questions,"topics":len(tf),"high_priority_topics":hp,"medium_priority_topics":mp,"low_priority_topics":lp,"exam_date":str(exam_date),"days_remaining":days_left,"daily_study_hours":daily_hours,"analysis_runs":st.session_state.analysis_runs})
 
 else:
-    st.markdown("### How it works")
-    a, b, c = st.columns(3)
-    for col, title, body in [
-        (a, "1 • Upload", "Add previous-year papers for one subject."),
-        (b, "2 • Analyze", "Extract text and detect recurring concepts."),
-        (c, "3 • Prepare", "Use predictions, roadmap, formulas and MCQs."),
-    ]:
-        with col:
-            st.markdown(f'<div class="card"><h4>{title}</h4><p style="color:{MUTED}">{body}</p></div>', unsafe_allow_html=True)
-    st.info("Tip: for the most reliable analysis, upload clear selectable-text PDFs from the same subject.")
+    st.markdown("### How ExamLens AI works")
+    cards=[("1 • Upload","Add previous-year papers for one subject."),("2 • Extract","Read paper text and validate extraction quality."),("3 • Analyze","Detect recurring concepts and difficulty patterns."),("4 • Predict","Generate evidence-based short and long questions."),("5 • Prepare","Build a roadmap, formulas and targeted MCQs."),("6 • Export","Download PDFs, CSV data and JSON analysis.")]
+    cols=st.columns(3)
+    for i,(title,body) in enumerate(cards):
+        with cols[i%3]: st.markdown(f'<div class="card"><h4>{esc(title)}</h4><p style="color:{MUTED} !important">{esc(body)}</p></div>',unsafe_allow_html=True)
+    st.info("💡 For the most reliable analysis, upload clear selectable-text PDFs from the same subject. Scanned/image-only papers may require OCR.")
