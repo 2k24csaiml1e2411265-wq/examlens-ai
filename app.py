@@ -24,38 +24,118 @@ if "dark_mode" not in st.session_state:
 dark = st.session_state.dark_mode
 
 if dark:
-    BG, CARD, BORDER, TEXT, MUTED = "#0b1020", "#11182b", "#26324a", "#eef2ff", "#9aa8c7"
-    ACCENT, ACCENT2, GOOD, WARN = "#7c6ff7", "#4f46e5", "#10b981", "#f59e0b"
+    BG, CARD, CARD_ALT, BORDER, TEXT, MUTED = "#0b1020", "#11182b", "#172039", "#26324a", "#eef2ff", "#9aa8c7"
+    ACCENT, ACCENT2, GOOD, WARN = "#8b7cf6", "#6366f1", "#10b981", "#f59e0b"
+    INPUT_BG = "#0f172a"
+    HERO_START, HERO_END = "#11142d", "#4f46e5"
+    CHART_GRID = "#26324a"
 else:
-    BG, CARD, BORDER, TEXT, MUTED = "#f7f8fc", "#ffffff", "#dfe3ef", "#172033", "#647089"
+    BG, CARD, CARD_ALT, BORDER, TEXT, MUTED = "#f7f8fc", "#ffffff", "#f1f4fa", "#dfe3ef", "#172033", "#647089"
     ACCENT, ACCENT2, GOOD, WARN = "#5b5bd6", "#4338ca", "#059669", "#d97706"
+    INPUT_BG = "#ffffff"
+    HERO_START, HERO_END = "#eef2ff", "#6366f1"
+    CHART_GRID = "#e2e8f0"
 
+# Keep all custom styling in one theme-aware layer. Avoid overriding every
+# descendant of Streamlit widgets because that breaks native control states.
 st.markdown(f"""
 <style>
-html, body, .stApp {{ background:{BG}!important; color:{TEXT}!important; }}
-.block-container {{ max-width:1250px; padding-top:1.4rem; }}
-section[data-testid="stSidebar"] > div {{ background:{CARD}!important; border-right:1px solid {BORDER}; }}
-section[data-testid="stSidebar"] * {{ color:{TEXT}!important; }}
-.hero {{ background:linear-gradient(135deg,#11142d,#4f46e5); padding:2.3rem 2rem;
-         border-radius:24px; margin-bottom:1.5rem; text-align:center; }}
-.hero h1 {{ color:white; font-size:2.7rem; margin:0; letter-spacing:-1px; }}
-.hero p {{ color:#c7d2fe; margin:.5rem 0 0; }}
+:root {{
+    --el-bg: {BG}; --el-card: {CARD}; --el-card-alt: {CARD_ALT};
+    --el-border: {BORDER}; --el-text: {TEXT}; --el-muted: {MUTED};
+    --el-accent: {ACCENT}; --el-accent-2: {ACCENT2};
+    --el-input: {INPUT_BG}; --el-grid: {CHART_GRID};
+}}
+
+html, body, [data-testid="stAppViewContainer"], .stApp {{
+    background: var(--el-bg) !important;
+    color: var(--el-text) !important;
+}}
+
+.block-container {{
+    max-width: 1250px;
+    padding: 1.5rem 2rem 3rem;
+}}
+
+/* Sidebar */
+section[data-testid="stSidebar"] {{
+    background: var(--el-card) !important;
+    border-right: 1px solid var(--el-border);
+}}
+section[data-testid="stSidebar"] > div {{
+    background: var(--el-card) !important;
+}}
+section[data-testid="stSidebar"] .stMarkdown,
+section[data-testid="stSidebar"] .stCaption,
+section[data-testid="stSidebar"] label {{
+    color: var(--el-text) !important;
+}}
+
+/* Hero */
+.hero {{
+    background: linear-gradient(135deg, {HERO_START}, {HERO_END});
+    border: 1px solid rgba(255,255,255,.12);
+    padding: clamp(1.5rem, 4vw, 2.5rem) clamp(1.1rem, 4vw, 2rem);
+    border-radius: 24px; margin-bottom: 1.5rem; text-align: center;
+    box-shadow: 0 18px 45px rgba(15,23,42,.12);
+}}
+.hero h1 {{ color: {'#ffffff' if dark else '#111827'}; font-size: clamp(2rem, 5vw, 2.7rem); margin: 0; letter-spacing: -1px; }}
+.hero-version {{ color: #c7d2fe; }}
+.hero p {{ color: {'#dbe4ff' if dark else '#eef2ff'}; margin: .55rem 0 0; }}
 .pill {{ display:inline-block; margin:10px 3px 0; padding:5px 11px; border-radius:999px;
-         background:rgba(255,255,255,.12); color:white; font-size:.76rem; }}
-.card {{ background:{CARD}; border:1px solid {BORDER}; border-radius:16px; padding:1rem; }}
+         background:rgba(255,255,255,.14); color:white; font-size:.76rem; border:1px solid rgba(255,255,255,.12); }}
+
+/* Reusable cards */
+.card, .metric, .priority, .pred, .day, .formula {{
+    background: var(--el-card) !important;
+    color: var(--el-text) !important;
+    border-color: var(--el-border) !important;
+}}
+.card {{ border:1px solid var(--el-border); border-radius:16px; padding:1rem; }}
 .metric {{ text-align:center; }}
-.metric .n {{ font-size:2rem; font-weight:800; color:{ACCENT}; }}
-.metric .l {{ font-size:.72rem; color:{MUTED}; text-transform:uppercase; letter-spacing:.08em; }}
-.priority {{ padding:.7rem .9rem; margin:.45rem 0; border-radius:10px; background:{CARD};
-             border:1px solid {BORDER}; }}
-.pred {{ padding:.85rem 1rem; margin:.45rem 0; border-radius:12px; background:{CARD};
-         border:1px solid {BORDER}; border-left:4px solid {ACCENT}; }}
-.day {{ padding:1rem; margin:.55rem 0; border-radius:14px; background:{CARD};
-        border:1px solid {BORDER}; border-left:4px solid {ACCENT}; }}
-.formula {{ font-family:monospace; padding:.8rem; margin:.4rem 0; border-radius:10px;
-            background:rgba(79,70,229,.08); border:1px solid {BORDER}; }}
-.notice {{ padding:.85rem 1rem; border-radius:12px; background:rgba(16,185,129,.08);
-           border:1px solid rgba(16,185,129,.25); margin:.7rem 0; }}
+.metric .n {{ font-size:2rem; font-weight:800; color:var(--el-accent); }}
+.metric .l {{ font-size:.72rem; color:var(--el-muted); text-transform:uppercase; letter-spacing:.08em; }}
+.priority {{ padding:.7rem .9rem; margin:.45rem 0; border-radius:10px; border:1px solid var(--el-border); }}
+.pred {{ padding:.85rem 1rem; margin:.45rem 0; border-radius:12px; border:1px solid var(--el-border); border-left:4px solid var(--el-accent) !important; }}
+.day {{ padding:1rem; margin:.55rem 0; border-radius:14px; border:1px solid var(--el-border); border-left:4px solid var(--el-accent) !important; }}
+.formula {{ font-family:ui-monospace,SFMono-Regular,Menlo,monospace; padding:.8rem; margin:.4rem 0; border-radius:10px; background:rgba(99,102,241,.08) !important; border:1px solid var(--el-border); }}
+.notice {{ padding:.85rem 1rem; border-radius:12px; background:rgba(16,185,129,.08); border:1px solid rgba(16,185,129,.25); margin:.7rem 0; color:var(--el-text); }}
+
+/* Native controls */
+div[data-baseweb="select"] > div,
+div[data-baseweb="input"] > div,
+div[data-baseweb="textarea"] > div {{
+    background: var(--el-input) !important;
+    border-color: var(--el-border) !important;
+}}
+[data-testid="stFileUploaderDropzone"] {{
+    background: var(--el-card) !important;
+    border: 1px dashed var(--el-border) !important;
+}}
+[data-testid="stFileUploaderDropzone"] small,
+[data-testid="stFileUploaderDropzone"] span {{ color: var(--el-muted) !important; }}
+
+/* Buttons */
+.stButton > button, .stDownloadButton > button {{
+    border-radius: 10px !important;
+    border: 1px solid var(--el-border) !important;
+    transition: transform .15s ease, box-shadow .15s ease;
+}}
+.stButton > button:hover, .stDownloadButton > button:hover {{
+    transform: translateY(-1px);
+    box-shadow: 0 7px 20px rgba(99,102,241,.16);
+}}
+
+/* Tabs */
+button[data-baseweb="tab"] {{ color: var(--el-muted) !important; }}
+button[data-baseweb="tab"][aria-selected="true"] {{ color: var(--el-accent) !important; }}
+
+/* Responsive layout */
+@media (max-width: 768px) {{
+    .block-container {{ padding: 1rem .8rem 2rem; }}
+    .hero {{ border-radius: 18px; }}
+    .metric .n {{ font-size: 1.55rem; }}
+}}
 </style>
 """, unsafe_allow_html=True)
 
@@ -72,7 +152,7 @@ subjects = [
 
 with st.sidebar:
     st.markdown("## 🎯 ExamLens AI")
-    st.caption("v2 • evidence-first exam analysis")
+    st.caption("v3 • evidence-first exam analysis")
     if st.button(("☀️ Light mode" if dark else "🌙 Dark mode"), use_container_width=True):
         st.session_state.dark_mode = not dark
         st.rerun()
@@ -90,7 +170,7 @@ with st.sidebar:
 # ---------- Header ----------
 st.markdown("""
 <div class="hero">
-<h1>🎯 ExamLens AI <span style="color:#a5b4fc">v2</span></h1>
+<h1>🎯 ExamLens AI <span class="hero-version">v2</span></h1>
 <p>Turn previous-year papers into a focused, evidence-based study plan.</p>
 <span class="pill">⚡ Groq + Llama</span>
 <span class="pill">📄 Multi-PDF</span>
@@ -113,6 +193,8 @@ if files:
 
 if "analysis" not in st.session_state:
     st.session_state.analysis = None
+if "mcqs" not in st.session_state:
+    st.session_state.mcqs = None
 if "paper_meta" not in st.session_state:
     st.session_state.paper_meta = []
 if "analysis_subject" not in st.session_state:
@@ -177,7 +259,7 @@ if d and d.get("analysis_status") == "success":
         if tf:
             df = pd.DataFrame({"Topic": list(tf.keys()), "Frequency": list(tf.values())}).sort_values("Frequency", ascending=False)
             fig = px.bar(df, x="Topic", y="Frequency", text="Frequency", title=f"Recurring topics — {subject}")
-            fig.update_layout(height=420, xaxis_tickangle=-30, paper_bgcolor=BG, plot_bgcolor=BG, font_color=TEXT)
+            fig.update_layout(height=420, xaxis_tickangle=-30, paper_bgcolor=BG, plot_bgcolor=BG, font_color=TEXT, hoverlabel=dict(bgcolor=CARD, font_color=TEXT), xaxis=dict(gridcolor=CHART_GRID, zerolinecolor=CHART_GRID), yaxis=dict(gridcolor=CHART_GRID, zerolinecolor=CHART_GRID))
             st.plotly_chart(fig, use_container_width=True)
         else:
             st.info("No reliable topic-frequency data was returned.")
@@ -195,7 +277,7 @@ if d and d.get("analysis_status") == "success":
                     x=list(diff.values()), y=list(diff.keys()), orientation="h",
                     text=list(diff.values()), textposition="outside"
                 ))
-                fig2.update_layout(title="Difficulty distribution", height=300, paper_bgcolor=BG, plot_bgcolor=BG, font_color=TEXT)
+                fig2.update_layout(title="Difficulty distribution", height=300, paper_bgcolor=BG, plot_bgcolor=BG, font_color=TEXT, hoverlabel=dict(bgcolor=CARD, font_color=TEXT), xaxis=dict(gridcolor=CHART_GRID, zerolinecolor=CHART_GRID), yaxis=dict(gridcolor=CHART_GRID, zerolinecolor=CHART_GRID))
                 st.plotly_chart(fig2, use_container_width=True)
 
         with st.expander("Paper extraction quality"):
