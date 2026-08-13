@@ -1,4 +1,4 @@
-# 🎯 ExamLens AI v3
+# 🎯 ExamLens AI v3 — Light Edition
 
 An AI-powered university exam-paper analyzer built with Streamlit, Groq and Llama.
 
@@ -51,7 +51,7 @@ For Streamlit Community Cloud, add `GROQ_API_KEY` under App → Settings → Sec
 **ExamLens AI — Exam Paper Analyzer & Question Predictor:** Built a Streamlit application that extracts university exam-paper text, uses an LLM to identify recurring topics and generate evidence-based predictions, creates a 7-day study roadmap and MCQ practice, and exports personalized PDFs.
 
 
-## 🎨 Version 3 UI Improvements
+## 🎨 Version 3 UI — Light Edition
 
 - Theme-aware light and dark styling across the application.
 - Improved sidebar, inputs, file uploader, tabs, buttons, cards and metrics.

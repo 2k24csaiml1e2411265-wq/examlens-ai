@@ -1,6 +1,8 @@
-"""PDF export helpers."""
+"""PDF export helpers for ExamLens AI."""
 import io
 import html
+from typing import Any
+
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import cm
@@ -14,8 +16,12 @@ PURPLE = colors.HexColor("#5B5BD6")
 
 def _doc(buffer):
     return SimpleDocTemplate(
-        buffer, pagesize=A4, rightMargin=1.7*cm, leftMargin=1.7*cm,
-        topMargin=1.6*cm, bottomMargin=1.6*cm
+        buffer,
+        pagesize=A4,
+        rightMargin=1.7 * cm,
+        leftMargin=1.7 * cm,
+        topMargin=1.6 * cm,
+        bottomMargin=1.6 * cm,
     )
 
 
@@ -33,18 +39,52 @@ def _styles():
     )
 
 
+def _to_lines(value: Any) -> list[str]:
+    """Normalize LLM output into printable text lines.
+
+    The model is asked for a string, but JSON responses can occasionally return
+    a list/dict. The previous implementation called splitlines() directly and
+    crashed with AttributeError in that case.
+    """
+    if value is None:
+        return []
+
+    if isinstance(value, str):
+        return value.splitlines()
+
+    if isinstance(value, (list, tuple)):
+        lines: list[str] = []
+        for item in value:
+            if isinstance(item, dict):
+                # Preserve useful question text when the model returns objects.
+                preferred = item.get("question") or item.get("text") or item.get("prompt")
+                if preferred is not None:
+                    lines.append(str(preferred))
+                else:
+                    lines.append(" • ".join(f"{k}: {v}" for k, v in item.items()))
+            else:
+                lines.append(str(item))
+        return lines
+
+    if isinstance(value, dict):
+        return [f"{k}: {v}" for k, v in value.items()]
+
+    return [str(value)]
+
+
 def _build(title, subject, text):
     buf = io.BytesIO()
     doc = _doc(buf)
     title_s, sub_s, h2_s, body_s = _styles()
     story = [
-        Paragraph(html.escape(title), title_s),
-        Paragraph(html.escape(f"Subject: {subject} • ExamLens AI v2"), sub_s),
+        Paragraph(html.escape(str(title)), title_s),
+        Paragraph(html.escape(f"Subject: {subject} • ExamLens AI v3"), sub_s),
         HRFlowable(width="100%", thickness=1, color=PURPLE),
         Spacer(1, 10),
     ]
-    for raw in text.splitlines():
-        line = raw.strip()
+
+    for raw in _to_lines(text):
+        line = str(raw).strip()
         if not line:
             story.append(Spacer(1, 5))
         elif line.startswith("#"):
@@ -52,6 +92,7 @@ def _build(title, subject, text):
         else:
             line = line.replace("**", "")
             story.append(Paragraph(html.escape(line), body_s))
+
     doc.build(story)
     return buf.getvalue()
 

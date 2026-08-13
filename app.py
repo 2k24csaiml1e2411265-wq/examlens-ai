@@ -12,129 +12,283 @@ from pdf_generator import (
 )
 
 st.set_page_config(
-    page_title="ExamLens AI v2",
+    page_title="ExamLens AI v3",
     page_icon="🎯",
     layout="wide",
     initial_sidebar_state="expanded",
 )
 
-# ---------- Theme ----------
-if "dark_mode" not in st.session_state:
-    st.session_state.dark_mode = True
-dark = st.session_state.dark_mode
+# ---------- Light theme ----------
+# ExamLens AI v3 uses a deliberately light, professional visual system.
+# The palette is kept high-contrast and print-friendly for students.
+BG = "#F7F9FC"
+CARD = "#FFFFFF"
+CARD_ALT = "#F1F5F9"
+BORDER = "#E2E8F0"
+TEXT = "#172033"
+MUTED = "#64748B"
+ACCENT = "#4F46E5"
+ACCENT2 = "#3730A3"
+GOOD = "#059669"
+WARN = "#D97706"
+INPUT_BG = "#FFFFFF"
+CHART_GRID = "#E2E8F0"
+HERO_START = "#EEF2FF"
+HERO_END = "#C7D2FE"
 
-if dark:
-    BG, CARD, CARD_ALT, BORDER, TEXT, MUTED = "#0b1020", "#11182b", "#172039", "#26324a", "#eef2ff", "#9aa8c7"
-    ACCENT, ACCENT2, GOOD, WARN = "#8b7cf6", "#6366f1", "#10b981", "#f59e0b"
-    INPUT_BG = "#0f172a"
-    HERO_START, HERO_END = "#11142d", "#4f46e5"
-    CHART_GRID = "#26324a"
-else:
-    BG, CARD, CARD_ALT, BORDER, TEXT, MUTED = "#f7f8fc", "#ffffff", "#f1f4fa", "#dfe3ef", "#172033", "#647089"
-    ACCENT, ACCENT2, GOOD, WARN = "#5b5bd6", "#4338ca", "#059669", "#d97706"
-    INPUT_BG = "#ffffff"
-    HERO_START, HERO_END = "#eef2ff", "#6366f1"
-    CHART_GRID = "#e2e8f0"
-
-# Keep all custom styling in one theme-aware layer. Avoid overriding every
-# descendant of Streamlit widgets because that breaks native control states.
 st.markdown(f"""
 <style>
 :root {{
-    --el-bg: {BG}; --el-card: {CARD}; --el-card-alt: {CARD_ALT};
-    --el-border: {BORDER}; --el-text: {TEXT}; --el-muted: {MUTED};
-    --el-accent: {ACCENT}; --el-accent-2: {ACCENT2};
-    --el-input: {INPUT_BG}; --el-grid: {CHART_GRID};
+    --el-bg: {BG};
+    --el-card: {CARD};
+    --el-card-alt: {CARD_ALT};
+    --el-border: {BORDER};
+    --el-text: {TEXT};
+    --el-muted: {MUTED};
+    --el-accent: {ACCENT};
+    --el-accent-2: {ACCENT2};
+    --el-good: {GOOD};
+    --el-warn: {WARN};
+    --el-input: {INPUT_BG};
+    --el-grid: {CHART_GRID};
 }}
 
+/* Base */
 html, body, [data-testid="stAppViewContainer"], .stApp {{
     background: var(--el-bg) !important;
     color: var(--el-text) !important;
 }}
 
 .block-container {{
-    max-width: 1250px;
-    padding: 1.5rem 2rem 3rem;
+    max-width: 1280px;
+    padding: 1.75rem 2rem 4rem;
+}}
+
+/* Typography */
+h1, h2, h3, h4, h5, h6, p, label, .stMarkdown {{
+    color: var(--el-text);
+}}
+
+[data-testid="stCaptionContainer"], .stCaption {{
+    color: var(--el-muted) !important;
 }}
 
 /* Sidebar */
 section[data-testid="stSidebar"] {{
-    background: var(--el-card) !important;
+    background: #FFFFFF !important;
     border-right: 1px solid var(--el-border);
+    box-shadow: 8px 0 30px rgba(15, 23, 42, .035);
 }}
 section[data-testid="stSidebar"] > div {{
-    background: var(--el-card) !important;
+    background: #FFFFFF !important;
 }}
-section[data-testid="stSidebar"] .stMarkdown,
-section[data-testid="stSidebar"] .stCaption,
-section[data-testid="stSidebar"] label {{
+section[data-testid="stSidebar"] [data-testid="stMarkdownContainer"] {{
     color: var(--el-text) !important;
+}}
+section[data-testid="stSidebar"] hr {{
+    border-color: var(--el-border) !important;
 }}
 
 /* Hero */
 .hero {{
-    background: linear-gradient(135deg, {HERO_START}, {HERO_END});
-    border: 1px solid rgba(255,255,255,.12);
-    padding: clamp(1.5rem, 4vw, 2.5rem) clamp(1.1rem, 4vw, 2rem);
-    border-radius: 24px; margin-bottom: 1.5rem; text-align: center;
-    box-shadow: 0 18px 45px rgba(15,23,42,.12);
+    position: relative;
+    overflow: hidden;
+    background: linear-gradient(135deg, {HERO_START} 0%, #FFFFFF 52%, {HERO_END} 100%);
+    border: 1px solid #D9E0F2;
+    padding: clamp(1.7rem, 4vw, 2.8rem) clamp(1.2rem, 4vw, 2.4rem);
+    border-radius: 26px;
+    margin-bottom: 1.7rem;
+    text-align: center;
+    box-shadow: 0 18px 50px rgba(79, 70, 229, .10);
 }}
-.hero h1 {{ color: {'#ffffff' if dark else '#111827'}; font-size: clamp(2rem, 5vw, 2.7rem); margin: 0; letter-spacing: -1px; }}
-.hero-version {{ color: #c7d2fe; }}
-.hero p {{ color: {'#dbe4ff' if dark else '#eef2ff'}; margin: .55rem 0 0; }}
-.pill {{ display:inline-block; margin:10px 3px 0; padding:5px 11px; border-radius:999px;
-         background:rgba(255,255,255,.14); color:white; font-size:.76rem; border:1px solid rgba(255,255,255,.12); }}
+.hero::before {{
+    content: "";
+    position: absolute;
+    width: 220px;
+    height: 220px;
+    border-radius: 50%;
+    background: rgba(99, 102, 241, .10);
+    top: -120px;
+    right: -60px;
+}}
+.hero h1 {{
+    position: relative;
+    color: #111827 !important;
+    font-size: clamp(2rem, 5vw, 2.85rem);
+    font-weight: 850;
+    margin: 0;
+    letter-spacing: -1.5px;
+}}
+.hero-version {{ color: var(--el-accent); }}
+.hero p {{
+    position: relative;
+    color: #475569 !important;
+    font-size: 1rem;
+    margin: .65rem 0 0;
+}}
+.pill {{
+    display: inline-block;
+    margin: 12px 3px 0;
+    padding: 6px 12px;
+    border-radius: 999px;
+    background: rgba(255,255,255,.82);
+    color: #3730A3;
+    font-size: .76rem;
+    font-weight: 650;
+    border: 1px solid #C7D2FE;
+    box-shadow: 0 2px 8px rgba(79,70,229,.06);
+}}
 
-/* Reusable cards */
+/* Cards */
 .card, .metric, .priority, .pred, .day, .formula {{
     background: var(--el-card) !important;
     color: var(--el-text) !important;
     border-color: var(--el-border) !important;
 }}
-.card {{ border:1px solid var(--el-border); border-radius:16px; padding:1rem; }}
-.metric {{ text-align:center; }}
-.metric .n {{ font-size:2rem; font-weight:800; color:var(--el-accent); }}
-.metric .l {{ font-size:.72rem; color:var(--el-muted); text-transform:uppercase; letter-spacing:.08em; }}
-.priority {{ padding:.7rem .9rem; margin:.45rem 0; border-radius:10px; border:1px solid var(--el-border); }}
-.pred {{ padding:.85rem 1rem; margin:.45rem 0; border-radius:12px; border:1px solid var(--el-border); border-left:4px solid var(--el-accent) !important; }}
-.day {{ padding:1rem; margin:.55rem 0; border-radius:14px; border:1px solid var(--el-border); border-left:4px solid var(--el-accent) !important; }}
-.formula {{ font-family:ui-monospace,SFMono-Regular,Menlo,monospace; padding:.8rem; margin:.4rem 0; border-radius:10px; background:rgba(99,102,241,.08) !important; border:1px solid var(--el-border); }}
-.notice {{ padding:.85rem 1rem; border-radius:12px; background:rgba(16,185,129,.08); border:1px solid rgba(16,185,129,.25); margin:.7rem 0; color:var(--el-text); }}
+.card {{
+    border: 1px solid var(--el-border);
+    border-radius: 16px;
+    padding: 1rem;
+    box-shadow: 0 5px 18px rgba(15,23,42,.035);
+}}
+.metric {{ text-align: center; padding: 1.05rem .7rem; }}
+.metric .n {{
+    font-size: 2rem;
+    font-weight: 850;
+    color: var(--el-accent);
+    line-height: 1.1;
+}}
+.metric .l {{
+    margin-top: .35rem;
+    font-size: .70rem;
+    color: var(--el-muted);
+    text-transform: uppercase;
+    letter-spacing: .08em;
+    font-weight: 650;
+}}
+.priority {{
+    padding: .72rem .9rem;
+    margin: .45rem 0;
+    border-radius: 11px;
+    border: 1px solid var(--el-border);
+    box-shadow: 0 2px 8px rgba(15,23,42,.025);
+}}
+.pred {{
+    padding: .9rem 1rem;
+    margin: .45rem 0;
+    border-radius: 12px;
+    border: 1px solid var(--el-border);
+    border-left: 4px solid var(--el-accent) !important;
+    box-shadow: 0 3px 12px rgba(15,23,42,.03);
+}}
+.day {{
+    padding: 1rem;
+    margin: .55rem 0;
+    border-radius: 14px;
+    border: 1px solid var(--el-border);
+    border-left: 4px solid var(--el-accent) !important;
+}}
+.formula {{
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    padding: .8rem;
+    margin: .4rem 0;
+    border-radius: 10px;
+    background: #F5F3FF !important;
+    border: 1px solid #DDD6FE;
+}}
+.notice {{
+    padding: .9rem 1rem;
+    border-radius: 12px;
+    background: #ECFDF5;
+    border: 1px solid #A7F3D0;
+    margin: .7rem 0;
+    color: #065F46;
+}}
 
-/* Native controls */
+/* Inputs and uploader */
 div[data-baseweb="select"] > div,
 div[data-baseweb="input"] > div,
 div[data-baseweb="textarea"] > div {{
     background: var(--el-input) !important;
     border-color: var(--el-border) !important;
+    border-radius: 10px !important;
 }}
 [data-testid="stFileUploaderDropzone"] {{
-    background: var(--el-card) !important;
-    border: 1px dashed var(--el-border) !important;
+    background: #FFFFFF !important;
+    border: 1.5px dashed #C7D2FE !important;
+    border-radius: 14px !important;
+    transition: border-color .15s ease, box-shadow .15s ease;
+}}
+[data-testid="stFileUploaderDropzone"]:hover {{
+    border-color: var(--el-accent) !important;
+    box-shadow: 0 8px 24px rgba(79,70,229,.07);
 }}
 [data-testid="stFileUploaderDropzone"] small,
-[data-testid="stFileUploaderDropzone"] span {{ color: var(--el-muted) !important; }}
+[data-testid="stFileUploaderDropzone"] span {{
+    color: var(--el-muted) !important;
+}}
 
 /* Buttons */
 .stButton > button, .stDownloadButton > button {{
+    min-height: 42px;
     border-radius: 10px !important;
     border: 1px solid var(--el-border) !important;
-    transition: transform .15s ease, box-shadow .15s ease;
+    background: #FFFFFF !important;
+    color: var(--el-text) !important;
+    font-weight: 650 !important;
+    transition: transform .15s ease, box-shadow .15s ease, border-color .15s ease;
 }}
 .stButton > button:hover, .stDownloadButton > button:hover {{
     transform: translateY(-1px);
-    box-shadow: 0 7px 20px rgba(99,102,241,.16);
+    border-color: #A5B4FC !important;
+    box-shadow: 0 8px 22px rgba(79,70,229,.12);
+}}
+.stButton > button[kind="primary"] {{
+    background: linear-gradient(135deg, #4F46E5, #6366F1) !important;
+    color: #FFFFFF !important;
+    border: none !important;
+    box-shadow: 0 8px 20px rgba(79,70,229,.18);
+}}
+.stButton > button[kind="primary"]:hover {{
+    box-shadow: 0 11px 26px rgba(79,70,229,.24);
 }}
 
 /* Tabs */
-button[data-baseweb="tab"] {{ color: var(--el-muted) !important; }}
-button[data-baseweb="tab"][aria-selected="true"] {{ color: var(--el-accent) !important; }}
+.stTabs [data-baseweb="tab-list"] {{
+    gap: 4px;
+    border-bottom: 1px solid var(--el-border);
+}}
+.stTabs [data-baseweb="tab"] {{
+    color: var(--el-muted) !important;
+    font-weight: 600;
+    padding: .7rem .85rem;
+}}
+.stTabs [data-baseweb="tab"][aria-selected="true"] {{
+    color: var(--el-accent) !important;
+    border-bottom-color: var(--el-accent) !important;
+}}
 
-/* Responsive layout */
+/* Alerts/status */
+[data-testid="stAlert"] {{ border-radius: 12px !important; }}
+[data-testid="stStatusWidget"] {{ border-radius: 12px !important; }}
+
+/* Dataframes */
+[data-testid="stDataFrame"] {{
+    border: 1px solid var(--el-border);
+    border-radius: 12px;
+    overflow: hidden;
+}}
+
+/* Links */
+a {{ color: var(--el-accent) !important; }}
+
+/* Responsive */
 @media (max-width: 768px) {{
     .block-container {{ padding: 1rem .8rem 2rem; }}
-    .hero {{ border-radius: 18px; }}
+    .hero {{ border-radius: 20px; padding: 1.5rem 1rem; }}
+    .hero h1 {{ letter-spacing: -1px; }}
     .metric .n {{ font-size: 1.55rem; }}
+    .pill {{ font-size: .70rem; padding: 5px 9px; }}
 }}
 </style>
 """, unsafe_allow_html=True)
@@ -152,11 +306,7 @@ subjects = [
 
 with st.sidebar:
     st.markdown("## 🎯 ExamLens AI")
-    st.caption("v3 • evidence-first exam analysis")
-    if st.button(("☀️ Light mode" if dark else "🌙 Dark mode"), use_container_width=True):
-        st.session_state.dark_mode = not dark
-        st.rerun()
-
+    st.caption("v3 • light edition • evidence-first exam analysis")
     st.divider()
     subject = st.selectbox("📚 Subject", subjects)
     st.divider()
@@ -170,7 +320,7 @@ with st.sidebar:
 # ---------- Header ----------
 st.markdown("""
 <div class="hero">
-<h1>🎯 ExamLens AI <span class="hero-version">v2</span></h1>
+<h1>🎯 ExamLens AI <span class="hero-version">v3</span></h1>
 <p>Turn previous-year papers into a focused, evidence-based study plan.</p>
 <span class="pill">⚡ Groq + Llama</span>
 <span class="pill">📄 Multi-PDF</span>
