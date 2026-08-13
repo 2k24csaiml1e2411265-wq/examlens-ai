@@ -205,13 +205,86 @@ section[data-testid="stSidebar"] hr {{
     color: #065F46;
 }}
 
-/* Inputs and uploader */
+/* Inputs, selectboxes, textareas and uploader — force the entire control into light mode */
 div[data-baseweb="select"] > div,
 div[data-baseweb="input"] > div,
-div[data-baseweb="textarea"] > div {{
-    background: var(--el-input) !important;
+div[data-baseweb="textarea"] > div,
+[data-testid="stTextArea"] > div,
+[data-testid="stTextArea"] textarea {{
+    background: #FFFFFF !important;
+    background-color: #FFFFFF !important;
     border-color: var(--el-border) !important;
     border-radius: 10px !important;
+    color: var(--el-text) !important;
+    color-scheme: light !important;
+    -webkit-text-fill-color: var(--el-text) !important;
+}}
+
+/* Text-area text was inheriting Streamlit/browser dark-mode colors. */
+[data-testid="stTextArea"] textarea,
+[data-testid="stTextArea"] textarea:focus {{
+    color: #172033 !important;
+    background: #FFFFFF !important;
+    background-color: #FFFFFF !important;
+    caret-color: #4F46E5 !important;
+    -webkit-text-fill-color: #172033 !important;
+    color-scheme: light !important;
+    opacity: 1 !important;
+}}
+[data-testid="stTextArea"] textarea::selection {{
+    background: #C7D2FE !important;
+    color: #172033 !important;
+}}
+
+/* Selectbox closed state and its internal text/icons. */
+[data-baseweb="select"] > div,
+[data-baseweb="select"] [role="combobox"] {{
+    background: #FFFFFF !important;
+    background-color: #FFFFFF !important;
+    color: #172033 !important;
+    color-scheme: light !important;
+}}
+[data-baseweb="select"] span,
+[data-baseweb="select"] input {{
+    color: #172033 !important;
+    -webkit-text-fill-color: #172033 !important;
+}}
+
+/* Selectbox popup rendered outside the main widget tree. */
+[role="listbox"],
+[role="option"],
+div[data-baseweb="popover"] {{
+    background: #FFFFFF !important;
+    background-color: #FFFFFF !important;
+    color: #172033 !important;
+    color-scheme: light !important;
+}}
+[role="option"] * {{
+    color: #172033 !important;
+    -webkit-text-fill-color: #172033 !important;
+}}
+[role="option"][aria-selected="true"] {{
+    background: #EEF2FF !important;
+}}
+
+/* File uploader's native Browse/Upload button. */
+[data-testid="stFileUploaderDropzone"] button {{
+    background: #FFFFFF !important;
+    background-color: #FFFFFF !important;
+    color: #172033 !important;
+    border: 1px solid #CBD5E1 !important;
+    border-radius: 9px !important;
+    box-shadow: none !important;
+    color-scheme: light !important;
+}}
+[data-testid="stFileUploaderDropzone"] button:hover {{
+    background: #F8FAFC !important;
+    border-color: #A5B4FC !important;
+    color: #3730A3 !important;
+}}
+[data-testid="stFileUploaderDropzone"] button * {{
+    color: inherit !important;
+    -webkit-text-fill-color: currentColor !important;
 }}
 [data-testid="stFileUploaderDropzone"] {{
     background: #FFFFFF !important;
@@ -228,76 +301,6 @@ div[data-baseweb="textarea"] > div {{
     color: var(--el-muted) !important;
 }}
 
-/* Native Streamlit controls — keep every control in the light theme */
-div[data-baseweb="select"] > div,
-div[data-baseweb="select"] [role="button"],
-div[data-baseweb="input"] > div,
-div[data-baseweb="textarea"] > div {{
-    background: #FFFFFF !important;
-    color: var(--el-text) !important;
-    border-color: var(--el-border) !important;
-    box-shadow: none !important;
-}}
-div[data-baseweb="select"] [role="button"] *,
-div[data-baseweb="select"] input,
-div[data-baseweb="input"] input,
-div[data-baseweb="textarea"] textarea {{
-    color: var(--el-text) !important;
-    -webkit-text-fill-color: var(--el-text) !important;
-}}
-div[data-baseweb="select"] svg,
-div[data-baseweb="input"] svg {{
-    fill: var(--el-muted) !important;
-    color: var(--el-muted) !important;
-}}
-[data-baseweb="popover"],
-[data-baseweb="menu"],
-[data-baseweb="menu"] > div,
-[data-baseweb="popover"] [role="listbox"] {{
-    background: #FFFFFF !important;
-    color: var(--el-text) !important;
-    border-color: var(--el-border) !important;
-}}
-[data-baseweb="menu"] [role="option"] {{
-    background: #FFFFFF !important;
-    color: var(--el-text) !important;
-}}
-[data-baseweb="menu"] [role="option"]:hover,
-[data-baseweb="menu"] [aria-selected="true"] {{
-    background: #EEF2FF !important;
-    color: var(--el-accent-2) !important;
-}}
-
-/* File uploader: Streamlit's native upload button must stay light */
-[data-testid="stFileUploaderDropzone"] button,
-[data-testid="stFileUploaderDropzone"] [role="button"] {{
-    background: #FFFFFF !important;
-    color: var(--el-text) !important;
-    border: 1px solid var(--el-border) !important;
-    box-shadow: none !important;
-}}
-[data-testid="stFileUploaderDropzone"] button:hover,
-[data-testid="stFileUploaderDropzone"] [role="button"]:hover {{
-    background: #F8FAFC !important;
-    color: var(--el-accent-2) !important;
-    border-color: #A5B4FC !important;
-}}
-[data-testid="stFileUploaderDropzone"] button *,
-[data-testid="stFileUploaderDropzone"] [role="button"] * {{
-    color: inherit !important;
-    fill: currentColor !important;
-}}
-
-/* Hide Streamlit's dark top chrome so the application owns the visual frame. */
-header[data-testid="stHeader"] {{
-    background: transparent !important;
-    visibility: hidden !important;
-    height: 0 !important;
-}}
-header[data-testid="stHeader"] > div {{
-    background: transparent !important;
-}}
-#MainMenu, footer {{ visibility: hidden !important; }}
 /* Buttons */
 .stButton > button, .stDownloadButton > button {{
     min-height: 42px;
