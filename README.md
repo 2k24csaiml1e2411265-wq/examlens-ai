@@ -7,7 +7,11 @@ ExamLens AI is a Streamlit-based application that uses **Groq and Llama** to ana
 The application extracts questions from uploaded PDFs, identifies recurring topics and patterns, generates evidence-based question predictions, creates a personalized 7-day study roadmap, provides MCQ practice, and exports study material as PDFs.
 
 ---
+## 🚀 Live Demo
 
+[Open ExamLens AI](https://examlens-ai-5abyyua2y9dmmgmltqkyce.streamlit.app/)
+
+---
 ## ✨ Features
 
 ### 📄 Exam Paper Analysis
